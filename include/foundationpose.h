@@ -2,8 +2,7 @@
 
 #include "refiner.h"
 #include "scorer.h"
-#include "util.h"
-
+#include "utils.h"
 
 class foundationpose
 {
@@ -12,6 +11,17 @@ private:
 public:
     foundationpose(/* args */);
     ~foundationpose();
+    bool UploadDataToDevice(const cv::Mat &rgb,
+                            const cv::Mat &depth,
+                            const cv::Mat &mask,
+                            const std::shared_ptr<int> &package) {}
+    bool RefinePreProcess(std::shared_ptr<int> package);
+
+    bool ScorePreprocess(std::shared_ptr<int> package);
+
+    bool ScorePostProcess(std::shared_ptr<int> package);
+
+    bool TrackPostProcess(std::shared_ptr<int> package);
 };
 
 foundationpose::foundationpose(/* args */)
