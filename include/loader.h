@@ -36,6 +36,10 @@ public:
         cv::Mat depth = cv::imread(depth_path, cv::IMREAD_ANYDEPTH);
         return std::make_tuple(rgb, depth);
     }
+    std::vector<std::filesystem::path> load_files_in_dir(const std::filesystem::path &dir_path)
+    {
+        std::cout<<"Loading files in directory"<<std::endl;
+    }
 };
 
 
