@@ -3,115 +3,21 @@
 #include "utils.h"
 #include "checker.h"
 #include "dataKeeper.h"
+#include "eroder.cuh"
+#include "bilateral_filter.cuh"
 
-__global__ void erode_depth_kernel(
-    float *depth, float *out, int H, int W, int radius, float depth_diff_thres, float ratio_thres,
-    float zfar)
-{
-  int h = blockIdx.y * blockDim.y + threadIdx.y;
-  int w = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (w >= W || h >= H)
-  {
-    return;
-  }
 
-  float d_ori = depth[h * W + w];
-
-  // Check the validity of the depth value
-  if (d_ori < 0.1f || d_ori >= zfar)
-  {
-    out[h * W + w] = 0.0f;
-    return;
-  }
-
-  float bad_cnt = 0.0f;
-  float total = 0.0f;
-
-  // Loop over the neighboring pixels
-  for (int u = w - radius; u <= w + radius; u++)
-  {
-    if (u < 0 || u >= W)
-    {
-      continue;
-    }
-    for (int v = h - radius; v <= h + radius; v++)
-    {
-      if (v < 0 || v >= H)
-      {
-        continue;
-      }
-      float cur_depth = depth[v * W + u];
-
-      total += 1.0f;
-
-      if (cur_depth < 0.1f || cur_depth >= zfar || fabsf(cur_depth - d_ori) > depth_diff_thres)
-      {
-        bad_cnt += 1.0f;
-      }
-    }
-  }
-
-  // Check the ratio of bad pixels
-  if ((bad_cnt / total) > ratio_thres)
-  {
-    out[h * W + w] = 0.0f;
-  }
-  else
-  {
-    out[h * W + w] = d_ori;
-  }
-}
-
-__global__ void bilateral_filter_depth_kernel(
-    float *depth, float *out, int H, int W, float zfar, int radius, float sigmaD, float sigmaR)
-{
-  int h = blockIdx.y * blockDim.y + threadIdx.y;
-  int w = blockIdx.x * blockDim.x + threadIdx.x;
-
-  if (w >= W || h >= H)
-  {
-    return;
-  }
-
-  out[h * W + w] = 0.0f;
-
-  // Compute the mean depth of the neighboring pixels
-  float mean_depth = 0.0f;
-  int num_valid = 0;
-  for (int u = w - radius; u <= w + radius; u++)
-  {
-    if (u < 0 || u >= W)
-    {
-      continue;
-    }
-    for (int v = h - radius; v <= h + radius; v++)
-    {
-      if (v < 0 || v >= H)
-      {
-        continue;
-      }
-      // Get the current depth value
-      float cur_depth = depth[v * W + u];
-      if (cur_depth >= 0.1f && cur_depth < zfar)
-      {
-        num_valid++;
-        mean_depth += cur_depth;
-      }
-    }
-  }
-}
 
 class Refiner
 {
 private:
   std::vector<Eigen::Matrix4f> pre_compute_rotations_;
   cudaStream_t cuda_stream_;
-  float *erode_depth_buffer_device_;
   const float min_depth_=10;
-  float *bilateral_depth_buffer_device_; // 声明变量
-  std::vector<float> bilateral_depth_buffer_host_;
   const Eigen::Matrix3f intrinsic_matrix;
+  std::shared_ptr<Eroder> eroder_;
+  std::shared_ptr<Bilateral_Filter> bilateral_filter_;
 
 public:
   Refiner(std::string engine_path)
@@ -123,39 +29,19 @@ public:
     };
     // 初始化成员变量
     cudaStreamCreate(&cuda_stream_);
-    cudaMalloc(&erode_depth_buffer_device_, sizeof(float) * MAX_INPUT_IMAGE_HEIGHT * MAX_INPUT_IMAGE_WIDTH);
-    cudaMalloc(&bilateral_depth_buffer_device_, sizeof(float) * MAX_INPUT_IMAGE_HEIGHT * MAX_INPUT_IMAGE_WIDTH);
+    cudaMalloc(&eroder_->erode_depth_buffer_device_, sizeof(float) * MAX_INPUT_IMAGE_HEIGHT * MAX_INPUT_IMAGE_WIDTH);
+    cudaMalloc(&bilateral_filter_->bilateral_depth_buffer_device_, sizeof(float) * MAX_INPUT_IMAGE_HEIGHT * MAX_INPUT_IMAGE_WIDTH);
     std::cout << "Refiner created" << std::endl;
   };
 
   ~Refiner()
   {
     // 释放设备内存
-    cudaFree(erode_depth_buffer_device_);
-    cudaFree(bilateral_depth_buffer_device_);
+    cudaFree(eroder_->erode_depth_buffer_device_);
+    cudaFree(bilateral_filter_->bilateral_depth_buffer_device_);
     cudaStreamDestroy(cuda_stream_);
   };
 
-  void erode_depth(
-      cudaStream_t stream, float *depth, float *out, int H, int W, int radius = 2,
-      float depth_diff_thres = 0.001, float ratio_thres = 0.8, float zfar = 100)
-  {
-    dim3 block(16, 16);
-    dim3 grid(ceil_div(W, 16), ceil_div(H, 16), 1);
-
-    erode_depth_kernel<<<grid, block, 0, stream>>>(
-        depth, out, H, W, radius, depth_diff_thres, ratio_thres, zfar);
-  }
-
-  void bilateral_filter_depth(
-      cudaStream_t stream, float *depth, float *out, int H, int W, float zfar = 100, int radius = 2, float sigmaD = 2,
-      float sigmaR = 100000)
-  {
-    dim3 block(16, 16);
-    dim3 grid(ceil_div(W, 16), ceil_div(H, 16), 1);
-
-    bilateral_filter_depth_kernel<<<grid, block, 0, stream>>>(depth, out, H, W, zfar, radius, sigmaD, sigmaR);
-  }
 
   bool GuessTranslation(
       const Eigen::MatrixXf &depth, const Eigen::Matrix<uint8_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> &mask, const Eigen::Matrix3f &K,
@@ -222,20 +108,20 @@ public:
     // 2. Optimize depth map
     float *depth_on_device = static_cast<float *>(_depth_on_device);
     // Assuming radius, depth_diff_thres, ratio_thres, zfar are member variables or defined elsewhere
-    erode_depth(cuda_stream_, depth_on_device, erode_depth_buffer_device_,
+    eroder_->erode_depth(cuda_stream_, depth_on_device, eroder_->erode_depth_buffer_device_,
                 input_image_height, input_image_width); // Example parameters
 
-    bilateral_filter_depth(cuda_stream_,
-                           erode_depth_buffer_device_,
-                           bilateral_depth_buffer_device_,
+    bilateral_filter_->bilateral_filter_depth(cuda_stream_,
+                           eroder_->erode_depth_buffer_device_,
+                           bilateral_filter_->bilateral_depth_buffer_device_,
                            input_image_height,
                            input_image_width);
 
     return true; // Or appropriate return value
 
     // 2.3 拷贝到host端缓存
-    cudaMemcpyAsync(bilateral_depth_buffer_host_.data(),
-                    bilateral_depth_buffer_device_,
+    cudaMemcpyAsync(bilateral_filter_->bilateral_depth_buffer_host_.data(),
+                    bilateral_filter_->bilateral_depth_buffer_device_,
                     input_image_height * input_image_width * sizeof(float),
                     cudaMemcpyDeviceToHost,
                     cuda_stream_);
@@ -245,7 +131,7 @@ public:
                "[FoundationPoseSampling] cudaStreamSync `cuda_stream_` FAILED!!!");
 
     Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>
-        bilateral_filter_depth_host(bilateral_depth_buffer_host_.data(),
+        bilateral_filter_depth_host(bilateral_filter_->bilateral_depth_buffer_host_.data(),
                                     input_image_height,
                                     input_image_width);
     Eigen::Map<Eigen::Matrix<uint8_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>
