@@ -9,12 +9,8 @@ private:
 public:
     Tracker(/* args */);
     ~Tracker();
+    void track(){
+        std::cout<<"Tracking"<<std::endl;
+    }   
 };
 
-Tracker::Tracker(/* args */)
-{
-}
-
-Tracker::~Tracker()
-{
-}

@@ -5,15 +5,11 @@ class Register
 private:
     /* data */
 public:
-    Register(/* args */);
-    ~Register();
+    Register(/* args */)=default;
+    ~Register()=default;
+    void regist()   {
+        std::cout<<"Registering"<<std::endl;
+    };
 };
 
-Register::Register(/* args */)
-{
-}
-
-Register::~Register()
-{
-}
 

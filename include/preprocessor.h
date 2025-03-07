@@ -11,10 +11,4 @@ public:
     ~Preprocessor();
 };
 
-Preprocessor::Preprocessor(/* args */)
-{
-}
 
-Preprocessor::~Preprocessor()
-{
-}

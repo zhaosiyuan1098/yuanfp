@@ -9,6 +9,10 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <filesystem>
+#include <cuda_runtime.h>
+#include "cuda.h"
+#include <gtest/gtest.h>
+#include <glog/logging.h>
 
 static const std::string refiner_engine_path_ = "/workspace/models/refiner_hwc_dynamic_fp16.engine";
 static const std::string scorer_engine_path_ = "/workspace/models/scorer_hwc_dynamic_fp16.engine";
@@ -24,3 +28,42 @@ const std::string first_mask_path = demo_data_path_ + "/masks/" + frame_id + ".p
 
 #define MAX_INPUT_IMAGE_HEIGHT 1080
 #define MAX_INPUT_IMAGE_WIDTH 1920
+
+
+#define CHECK_STATE(state, hint) \
+  {                              \
+    if (!(state))                \
+    {                            \
+      LOG(ERROR) << (hint);      \
+      return false;              \
+    }                            \
+  }
+
+#define MESSURE_DURATION(run)                                                                \
+  {                                                                                          \
+    auto start = std::chrono::high_resolution_clock::now();                                  \
+    (run);                                                                                   \
+    auto end = std::chrono::high_resolution_clock::now();                                    \
+    LOG(INFO) << #run << " cost(us): "                                                       \
+              << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count(); \
+  }
+
+#define MESSURE_DURATION_AND_CHECK_STATE(run, hint)                                          \
+  {                                                                                          \
+    auto start = std::chrono::high_resolution_clock::now();                                  \
+    CHECK_STATE((run), hint);                                                                \
+    auto end = std::chrono::high_resolution_clock::now();                                    \
+    LOG(INFO) << #run << " cost(us): "                                                       \
+              << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count(); \
+  }
+
+
+#define CHECK_CUDA(result, hint) \
+{ \
+  auto res = (result); \
+  if (res != cudaSuccess) { \
+    LOG(ERROR) << hint << "  CudaError: " << res; \
+    return false; \
+  } \
+}
+

@@ -6,7 +6,7 @@ target("simple_tests")
     add_cxxflags("-O3", "-Wextra", "-Wdeprecated", "-fPIC")  -- 编译选项
 
 
-    add_files("src/*.cpp")  -- 添加源文件
+    add_files( "src/*.cu")   -- 添加源文件
     add_includedirs("include")  -- 添加头文件搜索路径
     add_includedirs("/usr/include/eigen3")  -- Eigen3 头文件路径
     add_includedirs("/usr/include/opencv4")  -- OpenCV 头文件路径

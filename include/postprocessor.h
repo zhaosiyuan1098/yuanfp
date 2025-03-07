@@ -11,10 +11,4 @@ public:
     ~Postprocessor();
 };
 
-Postprocessor::Postprocessor(/* args */)
-{
-}
 
-Postprocessor::~Postprocessor()
-{
-}
