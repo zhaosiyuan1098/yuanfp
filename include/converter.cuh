@@ -34,10 +34,7 @@ public:
     Converter();
     ~Converter() = default;
 
-    static uint16_t ceil_div(uint16_t numerator, uint16_t denominator)
-    {
-        return (numerator + denominator - 1) / denominator;
-    }
+    
 
     void convert_depth_to_xyz_map(const float *depth_on_device, int input_image_height,
                                   int input_image_width, float *xyz_map_on_device,

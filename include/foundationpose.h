@@ -1,14 +1,12 @@
 #pragma once
 
-#include "refiner.h"
+#include "refiner.cuh"
 #include "scorer.h"
 #include "utils.h"
 #include "loader.h"
 #include "register.h"
 #include "scorer.h"
 #include "tracker.h"
-#include "preprocessor.h"
-#include "postprocessor.h"
 #include"converter.cuh"
 class Foundationpose
 {
@@ -36,21 +34,6 @@ public:
         this->intrinsic_matrix = loader_->load_camK();
     };
     ~Foundationpose()=default;
-    bool UploadDataToDevice(const cv::Mat &rgb,
-                            const cv::Mat &depth,
-                            const cv::Mat &mask,
-                            const Eigen::Matrix3f &intrinsic_matrix,
-                            const std::shared_ptr<DataKeeper> &dataKeeper)
-    {
-        return false;
-    }
-    bool RefinePreProcess(std::shared_ptr<int> package);
-
-    bool ScorePreprocess(std::shared_ptr<int> package);
-
-    bool ScorePostProcess(std::shared_ptr<int> package);
-
-    bool TrackPostProcess(std::shared_ptr<int> package);
 
     void regist() { register_->regist(); }
 

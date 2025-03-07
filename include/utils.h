@@ -67,3 +67,8 @@ const std::string first_mask_path = demo_data_path_ + "/masks/" + frame_id + ".p
   } \
 }
 
+
+static uint16_t ceil_div(uint16_t numerator, uint16_t denominator)
+    {
+        return (numerator + denominator - 1) / denominator;
+    }

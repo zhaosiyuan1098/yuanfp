@@ -9,8 +9,8 @@ class Loader
 private:
     /* data */
 public:
-    Loader(/* args */)=default;
-    ~Loader()=default;
+    Loader(/* args */) = default;
+    ~Loader() = default;
 
     Eigen::Matrix3f load_camK()
     {
@@ -46,7 +46,7 @@ public:
     bool upload_to_device(const cv::Mat &rgb,
                           const cv::Mat &depth,
                           const cv::Mat &mask,
-                            const Eigen::Matrix3f &intrinsic_matrix,
+                          const Eigen::Matrix3f &intrinsic_matrix,
                           std::shared_ptr<DataKeeper> dataKeeper)
     {
         const size_t input_image_height = rgb.rows;
@@ -90,4 +90,3 @@ public:
         return true;
     }
 };
-

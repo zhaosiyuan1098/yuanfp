@@ -18,6 +18,14 @@ public:
         std::cout << "Scorer created" << std::endl;
     };
     ~Scorer();
+    void scorePreProcess()
+    {
+        std::cout << "ScorePreProcess" << std::endl;
+    }
+    void scorePostProcess()
+    {
+        std::cout << "ScorePostProcess" << std::endl;
+    }
 };
 
 Scorer::~Scorer()
